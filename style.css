@@ -1,0 +1,29 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #1a1a2e;
+    color: #fff;
+    font-family: sans-serif;
+}
+
+#ui {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+h2 { margin: 0 0 5px 0; font-size: 1.2rem; }
+p { margin: 0 0 10px 0; font-size: 0.9rem; color: #aaa; }
+
+#stats {
+    font-family: monospace;
+    font-size: 1rem;
+    color: #4ecca3;
+}
+
+canvas {
+    display: block;
+}
