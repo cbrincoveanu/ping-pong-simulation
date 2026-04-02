@@ -12,8 +12,8 @@ export class Racket {
     }
 
     update(dt, targetX, targetY) {
-        const spring = 1600; // 400
-        const damp = 70; // 40
+        const spring = 1500; // 400
+        const damp = 60; // 40
         
         const ax = (targetX - this.x) * spring - this.vx * damp;
         const ay = (targetY - this.y) * spring - this.vy * damp;
@@ -31,7 +31,8 @@ export class Racket {
 
     // Used by AI (Smooth interpolation to target angle)
     setAngle(targetAngle, dt) {
-        this.angle += (targetAngle - this.angle) * 15 * dt;
+        //this.angle += (targetAngle - this.angle) * 15 * dt;
+        this.angle = targetAngle; // Instant angle change for AI (more responsive)
     }
 
     getSegment() {

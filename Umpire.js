@@ -47,19 +47,27 @@ export class Umpire {
         return true;
     }
 
-    awardPoint(winner, reason) {
+awardPoint(winner, reason) {
         if (!this.pointActive) return;
         
         this.score[winner]++;
         this.pointActive = false;
         this.pointsPlayed++;
         
-        // Serve switches every 2 points
         if (this.pointsPlayed % 2 === 0) {
             this.server = this.server === 'left' ? 'right' : 'left';
         }
 
-        this.delayTimer = 2.5; // Wait before next serve
+        this.delayTimer = 2.5; 
+        
+        // --- NEW: UMPIRE CONSOLE LOGGING ---
+        console.log(`\n=================================================`);
+        console.log(`[UMPIRE] Point goes to: ${winner.toUpperCase()}`);
+        console.log(`[UMPIRE] Reason: ${reason}`);
+        console.log(`[UMPIRE] Score: LEFT ${this.score.left} - ${this.score.right} RIGHT`);
+        console.log(`=================================================\n`);
+        // -----------------------------------
+
         this.onUIUpdate(winner, reason);
     }
 
