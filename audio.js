@@ -29,25 +29,23 @@ export function playHitSound(type, impactVelocity) {
     if (type === 'racket') {
         // High-pitched, crisp "Ping" (Plastic on Rubber)
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(2000 + Math.min(impactVelocity * 50, 200), now); // Steady high pitch
+        osc.frequency.setValueAtTime(1800 + Math.min(impactVelocity * 50, 200), now); // Steady high pitch
         
-        // Instant attack, ultra-fast decay for a percussive "click"
         gain.gain.setValueAtTime(volume * 0.8, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.01); 
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.005); 
         
         osc.start(now);
-        osc.stop(now + 0.02);
+        osc.stop(now + 0.001);
     } 
     else if (type === 'table') {
         // Woody, hollow "Pong" (Plastic on Wood/Floor)
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(1800 + Math.min(impactVelocity * 50, 200), now); // Medium-high steady pitch
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2000 + Math.min(impactVelocity * 50, 200), now); // Medium-high steady pitch
         
-        // Slightly longer decay than the racket, but still very fast
         gain.gain.setValueAtTime(volume, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.0025);
         
         osc.start(now);
-        osc.stop(now + 0.01);
+        osc.stop(now + 0.001);
     }
 }

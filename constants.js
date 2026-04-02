@@ -15,12 +15,12 @@ export const DRAG_COEFF = 0.4;
 export const MAGNUS_COEFF = 0.000005;
 
 // Materials
-export const RESTITUTION_TABLE = 0.85;
+export const RESTITUTION_TABLE = 0.88;
 export const FRICTION_TABLE = 0.2;
-export const RESTITUTION_RACKET = 0.7;
+export const RESTITUTION_RACKET = 0.6;
 export const FRICTION_RACKET = 0.85; 
 export const RESTITUTION_GROUND = 0.5;
-export const FRICTION_GROUND = 0.4;
+export const FRICTION_GROUND = 0.5;
 export const RESTITUTION_NET = 0.2;
 export const FRICTION_NET = 0.5;
 

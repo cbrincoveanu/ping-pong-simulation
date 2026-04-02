@@ -51,7 +51,7 @@ window.addEventListener('mousedown', () => {
 });
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
-        ball.reset(mousePhysX, mousePhysY + 0.5); // Drop from slightly above mouse
+        ball.reset(mousePhysX, mousePhysY + 1); // Drop from slightly above mouse
     }
 });
 
