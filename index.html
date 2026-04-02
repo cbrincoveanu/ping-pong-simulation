@@ -3,15 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Table Tennis Simulation</title>
+    <title>Scientific Table Tennis Sandbox</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="ui">
-        <h2>Table Tennis Simulation</h2>
-        <p><strong>Controls:</strong> Mouse to move racket | Scroll Wheel to rotate racket | Click to activate audio | <strong>Spacebar</strong> to spawn/drop ball</p>
-        <div id="stats"></div>
+        <h2>Table Tennis Sandbox</h2>
+        <p><strong>Mouse:</strong> Move | <strong>Wheel:</strong> Rotate | <strong>Click/Space:</strong> Toss Ball</p>
+        
+        <div id="infoPanel">
+            <div><strong>Score:</strong> <span id="scoreLeft">0</span> (Left) - <span id="scoreRight">0</span> (Right)</div>
+            <div><strong>Status:</strong> <span id="statusMsg">Server: LEFT (Move behind table to toss)</span></div>
+            <div id="stats">Speed: 0.0 m/s<br>Spin: 0 RPM</div>
+        </div>
     </div>
+
     <canvas id="gameCanvas"></canvas>
     <script type="module" src="main.js"></script>
 </body>
