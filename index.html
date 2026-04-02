@@ -9,10 +9,17 @@
 <body>
     <div id="ui">
         <h2>Table Tennis Sandbox</h2>
+        <div id="modeSelector" style="margin-bottom: 10px;">
+            <select id="gameMode" style="width: 100%; padding: 5px; background: #2c3e50; color: white; border: 1px solid #4ecca3; border-radius: 4px;">
+                <option value="AI_VS_AI" selected>AI vs AI (Spectator)</option>
+                <option value="H_VS_AI">Human (Left) vs AI (Right)</option>
+                <option value="H_VS_H">Human Self-Play (Sandbox)</option>
+            </select>
+        </div>
         <p><strong>Mouse:</strong> Move | <strong>Wheel:</strong> Rotate | <strong>Click/Space:</strong> Toss Ball</p>
         
         <div id="infoPanel">
-            <div><strong>Score:</strong> <span id="scoreLeft">0</span> (Left) - <span id="scoreRight">0</span> (Right)</div>
+            <div><strong>Score:</strong> <span id="scoreLeft">0</span> (L) - <span id="scoreRight">0</span> (R)</div>
             <div><strong>Status:</strong> <span id="statusMsg">Server: LEFT (Move behind table to toss)</span></div>
             <div id="stats">Speed: 0.0 m/s<br>Spin: 0 RPM</div>
         </div>

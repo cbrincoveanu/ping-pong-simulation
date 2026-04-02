@@ -5,35 +5,44 @@ import { Environment } from './Environment.js';
 import { checkCircleSegmentCollision, resolveCollision } from './physics.js';
 import { initAudio, playHitSound } from './audio.js';
 import { Umpire } from './Umpire.js';
+import { AI } from './AI.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const uiStats = document.getElementById('stats');
+const modeSelector = document.getElementById('gameMode');
 
 let width, height, originX, originY;
 
 // Initialize Objects
-const ball = new Ball(-1.0, 0.5); // Spawn on left side initially
-const racket = new Racket();
+const ball = new Ball(0, 0); 
 const env = new Environment();
+
+// Dual Rackets (Left = Red, Right = Blue)
+const racketLeft = new Racket('#e74c3c', Math.PI / 4);
+const racketRight = new Racket('#3498db', 3 * Math.PI / 4);
+
+// Dual AI
+const aiLeft = new AI('left');
+const aiRight = new AI('right');
 
 // Mouse state
 let mousePhysX = 0;
 let mousePhysY = 0;
 
+// Setup Umpire
 const umpire = new Umpire(
     (winner, reason) => {
-        if (winner !== null) { // A point was scored
+        if (winner !== null) {
             document.getElementById('scoreLeft').innerText = umpire.score.left;
             document.getElementById('scoreRight').innerText = umpire.score.right;
             document.getElementById('statusMsg').innerText = `Point ${winner.toUpperCase()}: ${reason}`;
-        } else { // Just a status update (like "Toss!")
+        } else {
             document.getElementById('statusMsg').innerText = reason;
         }
     },
     (nextServer) => {
-        // Point reset callback
-        document.getElementById('statusMsg').innerText = `Server: ${nextServer.toUpperCase()} (Move behind table and Click to Toss)`;
+        document.getElementById('statusMsg').innerText = `Server: ${nextServer.toUpperCase()} (Toss to start)`;
     }
 );
 
@@ -53,35 +62,72 @@ function toPhysY(cy) { return (originY - cy) / SCALE; }
 function toCanvasX(px) { return originX + px * SCALE; }
 function toCanvasY(py) { return originY - py * SCALE; }
 
-// Input
+// Human Input
 window.addEventListener('mousemove', (e) => {
     mousePhysX = toPhysX(e.clientX);
     mousePhysY = toPhysY(e.clientY);
 });
 window.addEventListener('wheel', (e) => {
-    racket.rotate(e.deltaY * 0.005);
+    const mode = modeSelector.value;
+    if (mode === 'H_VS_H' || mode === 'H_VS_AI') {
+        racketLeft.rotate(e.deltaY * 0.005);
+    }
+    if (mode === 'H_VS_H') {
+        racketRight.rotate(e.deltaY * 0.005);
+    }
 });
 
-function handleToss() {
+function handleTossCommand(racketX) {
     if (umpire.state === 'PRE_SERVE') {
-        if (umpire.requestToss(racket.x)) {
-            ball.vy = 4.0; // Toss velocity (~0.8 meters high)
+        if (umpire.requestToss(racketX)) {
+            ball.vy = 4.0;
         }
     }
 }
 
-window.addEventListener('mousedown', () => { 
+window.addEventListener('mousedown', (e) => { 
+    // FIX: Ignore clicks if they happen on the UI panel (like the dropdown)
+    if (e.target.closest('#ui')) return; 
+
     initAudio(); 
-    handleToss(); 
+    const mode = modeSelector.value;
+    if (mode === 'H_VS_AI' && umpire.server === 'left') handleTossCommand(racketLeft.x);
+    if (mode === 'H_VS_H') handleTossCommand(umpire.server === 'left' ? racketLeft.x : racketRight.x);
 });
 window.addEventListener('keydown', (e) => {
     initAudio();
-    if (e.code === 'Space') handleToss();
+    if (e.code === 'Space') {
+        const mode = modeSelector.value;
+        if (mode === 'H_VS_AI' && umpire.server === 'left') handleTossCommand(racketLeft.x);
+        if (mode === 'H_VS_H') handleTossCommand(umpire.server === 'left' ? racketLeft.x : racketRight.x);
+    }
 });
 
-// --- Physics Loop ---
+// Resets racket positions on mode switch so they don't get stuck
+modeSelector.addEventListener('change', () => {
+    umpire.resetState();
+    umpire.onResetTurn(umpire.server);
+});
+
+function checkRacketCollision(racket, playerSide) {
+    const rSeg = racket.getSegment();
+    const relVx = ball.vx - racket.vx;
+    const relVy = ball.vy - racket.vy;
+    
+    const rCol = checkCircleSegmentCollision(ball, rSeg.a, rSeg.b, relVx, relVy);
+    if (rCol.hit) {
+        ball.x += rCol.normal.x * (rCol.penetration + 0.0001);
+        ball.y += rCol.normal.y * (rCol.penetration + 0.0001);
+        
+        const impact = resolveCollision(ball, { vx: racket.vx, vy: racket.vy }, rCol.normal, RESTITUTION_RACKET, FRICTION_RACKET);
+        if (impact > 0) {
+            playHitSound('racket', impact);
+            umpire.onRacketHit(playerSide);
+        }
+    }
+}
+
 function checkCollisions() {
-    // 1. Ball vs Environment
     for (const seg of env.segments) {
         const col = checkCircleSegmentCollision(ball, seg.a, seg.b, ball.vx, ball.vy);
         if (col.hit) {
@@ -91,8 +137,6 @@ function checkCollisions() {
             const impact = resolveCollision(ball, { vx: 0, vy: 0 }, col.normal, seg.rest, seg.fric);
             if (impact > 0.5) {
                 playHitSound('table', impact);
-                
-                // NOTIFY UMPIRE
                 if (seg.id === 'tableLeft') umpire.onTableBounce('left');
                 if (seg.id === 'tableRight') umpire.onTableBounce('right');
                 if (seg.id === 'ground') umpire.onGroundHit();
@@ -100,57 +144,56 @@ function checkCollisions() {
         }
     }
 
-    // 2. Ball vs Racket
-    const racketSeg = racket.getSegment();
-    const relVx = ball.vx - racket.vx;
-    const relVy = ball.vy - racket.vy;
-    
-    const rCol = checkCircleSegmentCollision(ball, racketSeg.a, racketSeg.b, relVx, relVy);
-    if (rCol.hit) {
-        ball.x += rCol.normal.x * (rCol.penetration + 0.0001);
-        ball.y += rCol.normal.y * (rCol.penetration + 0.0001);
-        
-        const impact = resolveCollision(ball, { vx: racket.vx, vy: racket.vy }, rCol.normal, RESTITUTION_RACKET, FRICTION_RACKET);
-        if (impact > 0) {
-            playHitSound('racket', impact);
-            
-            // NOTIFY UMPIRE: Determine player by which side of the net the racket is on
-            const playerSide = racket.x < 0 ? 'left' : 'right';
-            umpire.onRacketHit(playerSide);
-        }
-    }
-}
-
-// Out of Bounds Safety Net
-function checkOutOfBounds() {
-    if (Math.abs(ball.x) > 4 || ball.y < -1.5) {
-        umpire.onGroundHit(); // Treat flying off-screen same as hitting the ground
-    }
+    checkRacketCollision(racketLeft, 'left');
+    checkRacketCollision(racketRight, 'right');
 }
 
 function update(dt) {
     umpire.update(dt);
+    const mode = modeSelector.value;
+
+    // Determine target positions for rackets based on Game Mode
+    let targetLeftX, targetLeftY, targetRightX, targetRightY;
+
+    // AI logic execution
+    let aiLeftCmd = null, aiRightCmd = null;
+    if (mode === 'AI_VS_AI') aiLeftCmd = aiLeft.update(dt, ball, umpire, handleTossCommand, racketLeft);
+    if (mode === 'H_VS_AI' || mode === 'AI_VS_AI') aiRightCmd = aiRight.update(dt, ball, umpire, handleTossCommand, racketRight);
+
+    // Left Racket (Red)
+    if (mode === 'H_VS_AI' || mode === 'H_VS_H') {
+        targetLeftX = mousePhysX; targetLeftY = mousePhysY;
+    } else {
+        targetLeftX = aiLeftCmd.x; targetLeftY = aiLeftCmd.y;
+        racketLeft.setAngle(aiLeftCmd.angle, dt);
+    }
+
+    // Right Racket (Blue)
+    if (mode === 'H_VS_H') {
+        targetRightX = mousePhysX; targetRightY = mousePhysY;
+    } else {
+        targetRightX = aiRightCmd.x; targetRightY = aiRightCmd.y;
+        racketRight.setAngle(aiRightCmd.angle, dt);
+    }
 
     for (let i = 0; i < SUB_STEPS; i++) {
-        racket.update(SUB_DT, mousePhysX, mousePhysY);
+        racketLeft.update(SUB_DT, targetLeftX, targetLeftY);
+        racketRight.update(SUB_DT, targetRightX, targetRightY);
         
         if (umpire.state === 'PRE_SERVE') {
-            // Pin the ball 25cm above the racket
-            ball.x = racket.x;
-            ball.y = racket.y + 0.25; 
-            ball.vx = 0;
-            ball.vy = 0;
-            ball.omega = 0;
-            // Skip collision checks so the racket doesn't hit it yet
+            const servingRacket = umpire.server === 'left' ? racketLeft : racketRight;
+            ball.x = servingRacket.x;
+            ball.y = servingRacket.y + 0.25; 
+            ball.vx = 0; ball.vy = 0; ball.omega = 0;
         } else {
             ball.update(SUB_DT);
             checkCollisions();
         }
     }
-    checkOutOfBounds();
+
+    if (Math.abs(ball.x) > 4 || ball.y < -1.5) umpire.onGroundHit();
 }
 
-// --- Render Loop ---
 function drawSegment(a, b, color, lineWidth) {
     ctx.strokeStyle = color;
     ctx.lineWidth = lineWidth;
@@ -165,7 +208,6 @@ function draw() {
     ctx.fillRect(0, 0, width, height);
 
     env.segments.forEach(seg => {
-        // Color net white, ground dark, table green
         let color = '#4ecca3';
         if (seg.id === 'net') color = '#ecf0f1';
         if (seg.id === 'ground') color = '#2c3e50';
@@ -180,18 +222,16 @@ function draw() {
     ctx.strokeStyle = '#e74c3c';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(
-        toCanvasX(ball.x - Math.cos(ball.angle) * ball.radius),
-        toCanvasY(ball.y - Math.sin(ball.angle) * ball.radius)
-    );
-    ctx.lineTo(
-        toCanvasX(ball.x + Math.cos(ball.angle) * ball.radius),
-        toCanvasY(ball.y + Math.sin(ball.angle) * ball.radius)
-    );
+    ctx.moveTo(toCanvasX(ball.x - Math.cos(ball.angle) * ball.radius), toCanvasY(ball.y - Math.sin(ball.angle) * ball.radius));
+    ctx.lineTo(toCanvasX(ball.x + Math.cos(ball.angle) * ball.radius), toCanvasY(ball.y + Math.sin(ball.angle) * ball.radius));
     ctx.stroke();
 
-    const rSeg = racket.getSegment();
-    drawSegment(rSeg.a, rSeg.b, '#e67e22', 6);
+    // Draw both rackets using their designated colors
+    const rSegL = racketLeft.getSegment();
+    drawSegment(rSegL.a, rSegL.b, racketLeft.color, 6);
+
+    const rSegR = racketRight.getSegment();
+    drawSegment(rSegR.a, rSegR.b, racketRight.color, 6);
 
     uiStats.innerHTML = `Speed: ${(Math.sqrt(ball.vx**2 + ball.vy**2)).toFixed(1)} m/s<br>` +
                         `Spin: ${((ball.omega * 60) / (2 * Math.PI)).toFixed(0)} RPM`;
