@@ -1,4 +1,4 @@
-import { TABLE_LENGTH, TIME_STEP, SUB_DT, SUB_STEPS, RESTITUTION_RACKET, FRICTION_RACKET } from './constants.js';
+import { TABLE_LENGTH, TIME_STEP, SUB_DT, SUB_STEPS, RESTITUTION_RACKET, FRICTION_RACKET, GROUND_LENGTH } from './constants.js';
 import { Ball } from './Ball.js';
 import { resolveCollision } from './physics.js';
 
@@ -7,11 +7,10 @@ export class AI {
         this.side = side;
         this.dir = side === 'left' ? 1 : -1; 
         this.baseX = side === 'left' ? -(TABLE_LENGTH / 2) - 0.15 : (TABLE_LENGTH / 2) + 0.15;
-        this.strikeStyle = 0.5; // 0.0 = Block (Rising), 0.5 = Apex (Top), 1.0 = Defensive (Falling)
 
         this.targetX = this.baseX;
         this.targetY = 0.2;
-        this.targetAngle = Math.PI * 0.5;
+        this.targetAngle = 'left' ? Math.PI * 0.75 : Math.PI * 0.25;
         
         this.state = 'IDLE'; 
         this.plan = null;
@@ -43,22 +42,32 @@ export class AI {
                 if ((this.side === 'left' && simBall.x < 0) || (this.side === 'right' && simBall.x > 0)) simHasBounced = true;
             }
 
-            // Logic to determine when to strike based on the randomized style
+            // Logic to determine when to strike based on the style
             let isStrikeTime = false;
             if (umpire.state === 'TOSS') {
-                isStrikeTime = simBall.vy < 0 && simBall.y < 0.45; // Serves hit on way down
+                isStrikeTime = simBall.vy < 0 && simBall.y < 0.4;
             } else if (simHasBounced) {
-                //if (this.strikeStyle < 0) {
-                    // BLOCK: Hit quickly after the bounce
-                    // not working well
-                //    isStrikeTime = simBall.y > 0.4 || simBall.vy < 0; 
-                //} else
-                if (this.strikeStyle < 0.5) {
-                    // APEX: Hit at the highest point (velocity near zero)
-                    isStrikeTime = simBall.vy < 0; 
+                let style;
+                if (this.config.style === 'allround') {
+                    const r = Math.random();
+                    style = r < 0.33 ? 'close' : (r < 0.66 ? 'apex' : 'late');
+                } if (this.config.style === 'aggressive') {
+                    const r = Math.random();
+                    style = r < 0.5 ? 'close' : 'apex';
+                } else if (this.config.style === 'chop') {
+                    style = 'late';
                 } else {
-                    // NORMAL/DEFENSIVE: Hit while falling at a height based on style
-                    isStrikeTime = simBall.vy < 0 && simBall.y < (0.1 + this.strikeStyle * 0.2);
+                    style = 'apex';
+                }
+                if (style === 'close') {
+                    // hit ball when it starts going down or right after the table
+                    isStrikeTime = simBall.vy < 0 || (this.side === 'left' ? simBall.x < this.baseX : simBall.x > this.baseX);
+                } else if (style === 'apex') {
+                    // hit at the highest point (velocity near zero)
+                    isStrikeTime = simBall.vy < 0; 
+                } else if (style === 'late') {
+                    // hit very late
+                    isStrikeTime = simBall.vy < 0 && simBall.y < 0.2;
                 }
             }
 
@@ -74,13 +83,13 @@ export class AI {
 
     // Specialized solver for Serves
     calculateOptimalServe(strikeBallState) {
-        let desiredLandingX = this.dir === 1 ? (TABLE_LENGTH / 2) * (0.3 + Math.random() * 0.5) : -(TABLE_LENGTH / 2) * (0.3 + Math.random() * 0.5);
+        let desiredLandingX = this.dir === 1 ? (TABLE_LENGTH / 2) * (0.4 + Math.random() * 0.5) : -(TABLE_LENGTH / 2) * (0.4 + Math.random() * 0.5);
         let bestDiff = Infinity;
         let bestSwing = null;
 
         // Serves need a more "downward" or "neutral" angle to hit own side first
-        let angles = this.side === 'left' ? [Math.PI * (0.5 + 0.4 * Math.random())] : [Math.PI * (0.5 - 0.4 * Math.random())];
-        let speedsx = [0, 1, 2.5, 4, 5, 6 * Math.random()];
+        let angles = this.side === 'left' ? [Math.PI * 0.75, Math.PI * (0.5 + 0.4 * Math.random())] : [Math.PI * 0.25, Math.PI * (0.5 - 0.4 * Math.random())];
+        let speedsx = [0, 1, 2.5, 4, 5, 8 * Math.random()];
         let speedsy = [-2, -1, 0, 1, 2, 3 - (6 * Math.random())];
 
         for (let a of angles) {
@@ -134,15 +143,26 @@ export class AI {
     }
 
     calculateOptimalSwing(strikeBallState) {
-        let desiredLandingX = this.dir === 1 ? (TABLE_LENGTH / 2) * (0.2 + Math.random() * 0.7) : -(TABLE_LENGTH / 2) * (0.2 + Math.random() * 0.7);
+        let desiredLandingX = this.dir === 1 ? (TABLE_LENGTH / 2) * (0.5 + Math.random() * 0.4) : -(TABLE_LENGTH / 2) * (0.5 + Math.random() * 0.4);
         let bestDiff = Infinity;
         let bestSwing = null;
 
-        //let angles = [Math.PI * 0.25, Math.PI * 0.4, Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.75, Math.PI * Math.random(), Math.PI * Math.random()];
-        let angles = [Math.PI * 0.25, Math.PI * 0.4, Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.75, Math.PI * Math.random(), Math.PI * Math.random()];
-        
-        let xspeeds = [-1, 0, 2, 4, 6, 10, 14, Math.random() * 14]; 
-        let yspeeds = [-2, 0, 2, 4, 6, 12, 12 - (Math.random() * 14)];
+        let angles = [];
+        let xspeeds = [];
+        let yspeeds = [];
+        if (this.config.style === 'allround') {
+            angles = [Math.PI * 0.25, Math.PI * 0.4, Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.75, Math.PI * Math.random(), Math.PI * Math.random()];
+            xspeeds = [-1, 0, 2, 4, 6, 10, 14, Math.random() * 14];
+            yspeeds = [-2, 0, 2, 4, 6, 12, 12 - (Math.random() * 14)];
+        } else if (this.config.style === 'aggressive') {
+            angles = this.side === 'left' ? [Math.PI * 0.35, Math.PI * 0.4, Math.PI * 0.45] : [Math.PI * 0.65, Math.PI * 0.6, Math.PI * 0.55];
+            xspeeds = [2, 4, 6, 10, 14, Math.random() * 14];
+            yspeeds = [-1, 0, 2, 4, 6, 12, 16];
+        } else if (this.config.style === 'chop') {
+            angles = this.side === 'left' ? [Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.7, Math.PI * 0.8] : [Math.PI * 0.5, Math.PI * 0.4, Math.PI * 0.3, Math.PI * 0.2];
+            xspeeds = [0, 2, 4, 6];
+            yspeeds = [-6, -4, -2, 0, 1];
+        }
 
         for (let a of angles) {
             for (let vx of xspeeds) {
@@ -181,7 +201,8 @@ export class AI {
         return bestSwing || { vx: this.dir * 4, vy: 1.5, angle: Math.PI * 0.5, expectedLandingX: desiredLandingX };
     }
 
-    update(dt, ball, umpire, onTossCommand, racket) {
+    update(dt, ball, umpire, onTossCommand, racket, config) {
+        this.config = config;
         const rx = racket.x; const ry = racket.y;
 
         // --- 1. ABORT EVERYTHING IF THE POINT IS OVER ---
@@ -194,7 +215,7 @@ export class AI {
             
             this.targetX += (this.baseX - this.targetX) * 5 * dt;
             this.targetY += (0.2 - this.targetY) * 5 * dt;
-            this.targetAngle += ((Math.PI * 0.5) - this.targetAngle) * 5 * dt;
+            this.targetAngle += ((this.side === 'left' ? Math.PI * 0.75 : Math.PI * 0.25) - this.targetAngle) * 5 * dt;
             return { x: this.targetX, y: this.targetY, angle: this.targetAngle };
         }
 
@@ -205,8 +226,8 @@ export class AI {
                 console.log(`[AI ${this.side}] >> ACTUAL LANDING X: ${ball.x.toFixed(3)} | Expected: ${this.plannedSwing.expectedLandingX.toFixed(3)} | Diff: ${landingDiff.toFixed(3)}m`);
                 this.monitoringFlight = false;
             } 
-            // FIX: Increased boundary to 5 meters so deep-baseline play doesn't trigger a "Failure" log
-            else if (ball.y < -0.5 || Math.abs(ball.x) > 5.0) {
+            // FIX: Increased boundary so deep-baseline play doesn't trigger a "Failure" log
+            else if (ball.y < -0.5 || Math.abs(ball.x) > GROUND_LENGTH) {
                 console.log(`[AI ${this.side}] >> ACTUAL LANDING: FAILED (Ball out of play)`);
                 this.monitoringFlight = false;
             }
@@ -243,7 +264,6 @@ export class AI {
         if (umpire.state === 'TOSS' && umpire.server === this.side && this.state === 'IDLE') {
             let prediction = this.predictStrikePoint(ball, umpire);
             if (prediction.found) {
-                this.strikeStyle = Math.random(); // Randomize style for every new incoming ball
                 this.plan = prediction;
                 this.plannedSwing = this.calculateOptimalServe(prediction.ballState);
                 this.timeToImpact = prediction.time;
@@ -312,7 +332,7 @@ export class AI {
         } else if (this.state === 'IDLE') {
             this.targetX += (this.baseX - this.targetX) * 5 * dt;
             this.targetY += (0.2 - this.targetY) * 5 * dt;
-            this.targetAngle += ((Math.PI * 0.5) - this.targetAngle) * 5 * dt;
+            this.targetAngle += ((this.side === 'left' ? Math.PI * 0.3 : Math.PI * 0.7) - this.targetAngle) * 5 * dt;
         }
 
         return { x: this.targetX, y: this.targetY, angle: this.targetAngle };

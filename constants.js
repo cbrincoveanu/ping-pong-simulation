@@ -7,7 +7,8 @@ export const TABLE_LENGTH = 2.74;
 export const TABLE_HEIGHT = 0.76;
 export const NET_HEIGHT = 0.1525;
 export const BALL_RADIUS = 0.02; 
-export const BALL_MASS = 0.0027; 
+export const BALL_MASS = 0.0027;
+export const GROUND_LENGTH = 5;
 
 // Aerodynamics
 export const AIR_DENSITY = 1.225; 

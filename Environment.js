@@ -1,4 +1,4 @@
-import { TABLE_LENGTH, TABLE_HEIGHT, NET_HEIGHT, RESTITUTION_TABLE, FRICTION_TABLE, RESTITUTION_GROUND, FRICTION_GROUND } from './constants.js';
+import { TABLE_LENGTH, TABLE_HEIGHT, NET_HEIGHT, GROUND_LENGTH, RESTITUTION_TABLE, FRICTION_TABLE, RESTITUTION_GROUND, FRICTION_GROUND } from './constants.js';
 
 export const RESTITUTION_NET = 0.2;
 export const FRICTION_NET = 0.5;
@@ -17,7 +17,7 @@ export class Environment {
             { id: 'net', a: { x: 0.005, y: 0 }, b: { x: 0.005, y: NET_HEIGHT }, rest: RESTITUTION_NET, fric: FRICTION_NET },
             { id: 'net', a: { x: -0.005, y: NET_HEIGHT }, b: { x: 0.005, y: NET_HEIGHT }, rest: RESTITUTION_NET, fric: FRICTION_NET },
             
-            { id: 'ground', a: { x: -5, y: groundY }, b: { x: 5, y: groundY }, rest: RESTITUTION_GROUND, fric: FRICTION_GROUND }
+            { id: 'ground', a: { x: -GROUND_LENGTH, y: groundY }, b: { x: GROUND_LENGTH, y: groundY }, rest: RESTITUTION_GROUND, fric: FRICTION_GROUND }
         ];
     }
 }

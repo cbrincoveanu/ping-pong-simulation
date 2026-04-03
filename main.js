@@ -10,7 +10,8 @@ import { AI } from './AI.js';
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const uiStats = document.getElementById('stats');
-const modeSelector = document.getElementById('gameMode');
+
+let isHumanMode = false;
 
 let width, height, originX, originY;
 
@@ -68,12 +69,8 @@ window.addEventListener('mousemove', (e) => {
     mousePhysY = toPhysY(e.clientY);
 });
 window.addEventListener('wheel', (e) => {
-    const mode = modeSelector.value;
-    if (mode === 'H_VS_H' || mode === 'H_VS_AI') {
+    if (document.getElementById('modeLeft').value === 'human') {
         racketLeft.rotate(e.deltaY * 0.005);
-    }
-    if (mode === 'H_VS_H') {
-        racketRight.rotate(e.deltaY * 0.005);
     }
 });
 
@@ -85,29 +82,31 @@ function handleTossCommand(racketX) {
     }
 }
 
-window.addEventListener('mousedown', (e) => { 
-    // FIX: Ignore clicks if they happen on the UI panel (like the dropdown)
-    if (e.target.closest('#ui')) return; 
-
-    initAudio(); 
-    const mode = modeSelector.value;
-    if (mode === 'H_VS_AI' && umpire.server === 'left') handleTossCommand(racketLeft.x);
-    if (mode === 'H_VS_H') handleTossCommand(umpire.server === 'left' ? racketLeft.x : racketRight.x);
-});
 window.addEventListener('keydown', (e) => {
     initAudio();
     if (e.code === 'Space') {
-        const mode = modeSelector.value;
-        if (mode === 'H_VS_AI' && umpire.server === 'left') handleTossCommand(racketLeft.x);
-        if (mode === 'H_VS_H') handleTossCommand(umpire.server === 'left' ? racketLeft.x : racketRight.x);
+        // Only allow human toss if it's the human's turn to serve
+        if (document.getElementById('modeLeft').value === 'human' && umpire.server === 'left') {
+            handleTossCommand(racketLeft.x);
+        }
+    }
+    // Turn wheel based on up/down arrow keys for human player
+    if (document.getElementById('modeLeft').value === 'human') {
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+            racketLeft.rotate(-0.1);
+        } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+            racketLeft.rotate(0.1);
+        }
+    }
+});
+// Allow human toss also by clicking when it's the human's turn to serve
+window.addEventListener('click', (e) => {
+    initAudio();
+    if (document.getElementById('modeLeft').value === 'human' && umpire.server === 'left') {
+        handleTossCommand(racketLeft.x);
     }
 });
 
-// Resets racket positions on mode switch so they don't get stuck
-modeSelector.addEventListener('change', () => {
-    umpire.resetState();
-    umpire.onResetTurn(umpire.server);
-});
 
 function checkRacketCollision(racket, playerSide) {
     const rSeg = racket.getSegment();
@@ -150,40 +149,42 @@ function checkCollisions() {
 
 function update(dt) {
     umpire.update(dt);
-    const mode = modeSelector.value;
 
-    // Determine target positions for rackets based on Game Mode
-    let targetLeftX, targetLeftY, targetRightX, targetRightY;
+    // READ UI CONFIGURATIONS
+    const cfgLeft = {
+        mode: document.getElementById('modeLeft').value,
+        style: document.getElementById('styleLeft').value
+    };
+    const cfgRight = {
+        style: document.getElementById('styleRight').value,
+    };
 
-    // AI logic execution
-    let aiLeftCmd = null, aiRightCmd = null;
-    if (mode === 'AI_VS_AI') aiLeftCmd = aiLeft.update(dt, ball, umpire, handleTossCommand, racketLeft);
-    if (mode === 'H_VS_AI' || mode === 'AI_VS_AI') aiRightCmd = aiRight.update(dt, ball, umpire, handleTossCommand, racketRight);
+    let targetLeftX, targetLeftY, targetLeftAngle;
+    let targetRightX, targetRightY, targetRightAngle;
 
-    // Left Racket (Red)
-    if (mode === 'H_VS_AI' || mode === 'H_VS_H') {
-        targetLeftX = mousePhysX; targetLeftY = mousePhysY;
+    // AI logic for Right
+    const aiRightCmd = aiRight.update(dt, ball, umpire, handleTossCommand, racketRight, cfgRight);
+    targetRightX = aiRightCmd.x; targetRightY = aiRightCmd.y; targetRightAngle = aiRightCmd.angle;
+
+    // Logic for Left (Human vs AI toggle)
+    if (cfgLeft.mode === 'human') {
+        targetLeftX = mousePhysX; targetLeftY = mousePhysY; targetLeftAngle = racketLeft.angle;
     } else {
-        targetLeftX = aiLeftCmd.x; targetLeftY = aiLeftCmd.y;
-        racketLeft.setAngle(aiLeftCmd.angle, dt);
-    }
-
-    // Right Racket (Blue)
-    if (mode === 'H_VS_H') {
-        targetRightX = mousePhysX; targetRightY = mousePhysY;
-    } else {
-        targetRightX = aiRightCmd.x; targetRightY = aiRightCmd.y;
-        racketRight.setAngle(aiRightCmd.angle, dt);
+        const aiLeftCmd = aiLeft.update(dt, ball, umpire, handleTossCommand, racketLeft, cfgLeft);
+        targetLeftX = aiLeftCmd.x; targetLeftY = aiLeftCmd.y; targetLeftAngle = aiLeftCmd.angle;
     }
 
     for (let i = 0; i < SUB_STEPS; i++) {
         racketLeft.update(SUB_DT, targetLeftX, targetLeftY);
         racketRight.update(SUB_DT, targetRightX, targetRightY);
         
+        // Only the AI uses setAngle (Human uses scroll wheel via rotate())
+        if (!isHumanMode) racketLeft.setAngle(targetLeftAngle, SUB_DT);
+        racketRight.setAngle(targetRightAngle, SUB_DT);
+
         if (umpire.state === 'PRE_SERVE') {
             const servingRacket = umpire.server === 'left' ? racketLeft : racketRight;
-            ball.x = servingRacket.x;
-            ball.y = servingRacket.y + 0.25; 
+            ball.x = servingRacket.x; ball.y = servingRacket.y + 0.15; // 15cm above racket
             ball.vx = 0; ball.vy = 0; ball.omega = 0;
         } else {
             ball.update(SUB_DT);

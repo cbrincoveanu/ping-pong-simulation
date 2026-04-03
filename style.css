@@ -17,14 +17,27 @@ canvas {
     position: absolute; 
     top: 15px; 
     left: 15px;
-    background: rgba(15, 15, 25, 0.85); /* Dark semi-transparent panel */
+    background: rgba(15, 15, 25, 0.85); 
     padding: 15px; 
     border-radius: 8px;
     border: 1px solid #333;
-    pointer-events: none; 
     z-index: 10;
-    min-width: 300px;
+    min-width: 350px;
+    max-height: 90vh;
+    overflow-y: auto;
 }
+
+.config-panel {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    border-left: 3px solid #4ecca3;
+}
+.config-panel.right-ai { border-left-color: #e74c3c; }
+.config-panel h3 { margin: 0 0 5px 0; font-size: 1rem; color: #fff; }
+.config-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.85rem; }
+select { background: #2c3e50; color: white; border: 1px solid #555; padding: 2px; border-radius: 3px; }
 
 h2 { margin: 0 0 10px 0; font-size: 1.2rem; color: #4ecca3; }
 p { margin: 0 0 15px 0; font-size: 0.85rem; color: #aaa; }
