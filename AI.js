@@ -52,10 +52,13 @@ export class AI {
                     const r = Math.random();
                     style = r < 0.33 ? 'close' : (r < 0.66 ? 'apex' : 'late');
                 } if (this.config.style === 'aggressive') {
-                    const r = Math.random();
-                    style = r < 0.5 ? 'close' : 'apex';
+                    //const r = Math.random();
+                    //style = r < 0.5 ? 'close' : 'apex';
+                    style = 'apex'; // or close?
                 } else if (this.config.style === 'chop') {
-                    style = 'late';
+                    style = 'apex'; // or late?
+                } else if (this.config.style === 'block') {
+                    style = 'close';
                 } else {
                     style = 'apex';
                 }
@@ -88,7 +91,7 @@ export class AI {
         let bestSwing = null;
 
         // Serves need a more "downward" or "neutral" angle to hit own side first
-        let angles = this.side === 'left' ? [Math.PI * 0.75, Math.PI * (0.5 + 0.4 * Math.random())] : [Math.PI * 0.25, Math.PI * (0.5 - 0.4 * Math.random())];
+        let angles = this.side === 'left' ? [Math.PI * 0.75, Math.PI * 0.5, Math.PI * (0.5 + 0.4 * Math.random())] : [Math.PI * 0.25, Math.PI * 0.5, Math.PI * (0.5 - 0.4 * Math.random())];
         let speedsx = [0, 1, 2.5, 4, 5, 8 * Math.random()];
         let speedsy = [-2, -1, 0, 1, 2, 3 - (6 * Math.random())];
 
@@ -143,61 +146,112 @@ export class AI {
     }
 
     calculateOptimalSwing(strikeBallState) {
-        let desiredLandingX = this.dir === 1 ? (TABLE_LENGTH / 2) * (0.5 + Math.random() * 0.4) : -(TABLE_LENGTH / 2) * (0.5 + Math.random() * 0.4);
-        let bestDiff = Infinity;
+        let desiredLandingX = this.dir === 1 ? (TABLE_LENGTH / 2) * 0.75 : -(TABLE_LENGTH / 2) * 0.75;
+        let bestValue = Infinity;
         let bestSwing = null;
 
-        let angles = [];
-        let xspeeds = [];
-        let yspeeds = [];
-        if (this.config.style === 'allround') {
-            angles = [Math.PI * 0.25, Math.PI * 0.4, Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.75, Math.PI * Math.random(), Math.PI * Math.random()];
-            xspeeds = [-1, 0, 2, 4, 6, 10, 14, Math.random() * 14];
-            yspeeds = [-2, 0, 2, 4, 6, 12, 12 - (Math.random() * 14)];
-        } else if (this.config.style === 'aggressive') {
-            angles = this.side === 'left' ? [Math.PI * 0.35, Math.PI * 0.4, Math.PI * 0.45] : [Math.PI * 0.65, Math.PI * 0.6, Math.PI * 0.55];
-            xspeeds = [2, 4, 6, 10, 14, Math.random() * 14];
-            yspeeds = [-1, 0, 2, 4, 6, 12, 16];
+        let combinations = []; // Will hold {angle, vx, vy}
+
+        // HELPER: Get the Normal vector pointing towards the opponent
+        const getNormal = (a, side) => {
+            let nx = -Math.sin(a); let ny = Math.cos(a);
+            if (side === 'left' && nx < 0) { nx = -nx; ny = -ny; }
+            if (side === 'right' && nx > 0) { nx = -nx; ny = -ny; }
+            return { x: nx, y: ny };
+        };
+
+        // HELPER: Get the Tangent vector along the racket face
+        const getFaceVector = (a, upward) => {
+            // Math.cos/sin(a) naturally points "Up" and towards the back of the racket
+            let f = { x: Math.cos(a), y: Math.sin(a) };
+            return upward ? f : { x: -f.x, y: -f.y }; // Reverses to point "Down" for chops
+        };
+
+        // HELPER: Blend the Normal (Push) and Tangent (Brush) into a single optimized list
+        const buildCombos = (angles, mags, normalWeight, tangentWeight, brushUpward) => {
+            for (let a of angles) {
+                let n = getNormal(a, this.side);
+                let t = getFaceVector(a, brushUpward);
+                
+                // Blend push and brush vectors based on the style percentages
+                let dirX = (n.x * normalWeight) + (t.x * tangentWeight);
+                let dirY = (n.y * normalWeight) + (t.y * tangentWeight);
+                
+                // Normalize the resulting vector so magnitude applies evenly
+                let len = Math.sqrt(dirX * dirX + dirY * dirY);
+                dirX /= len; dirY /= len;
+
+                // Create a combo for each requested swing speed
+                for (let m of mags) {
+                    combinations.push({ angle: a, vx: dirX * m, vy: dirY * m });
+                }
+            }
+        };
+
+        // --- 1. GENERATE COMBINATIONS BASED ON STYLE ---
+        if (this.config.style === 'aggressive') {
+            let angles = this.side === 'left' ? [0.3, 0.35, 0.4, 0.45, 0.5] : [0.7, 0.65, 0.6, 0.55, 0.5];
+            // 50% Forward push, 50% Upward brush (Topspin)
+            buildCombos(angles.map(v => v * Math.PI), [4, 6, 8, 10, 12], 0.5, 0.5, true);
+            
         } else if (this.config.style === 'chop') {
-            angles = this.side === 'left' ? [Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.7, Math.PI * 0.8] : [Math.PI * 0.5, Math.PI * 0.4, Math.PI * 0.3, Math.PI * 0.2];
-            xspeeds = [0, 2, 4, 6];
-            yspeeds = [-6, -4, -2, 0, 1];
+            let angles = this.side === 'left' ? [0.5, 0.6, 0.7, 0.8, 0.9, 1.0] : [0.5, 0.4, 0.3, 0.2, 0.1, 0.0];
+            // Heavy Backspin
+            buildCombos(angles.map(v => v * Math.PI), [0, 1, 2, 4, 6, 8, 12], 0.25, 0.75, false);
+            
+        } else if (this.config.style === 'block') {
+            let angles = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+            // 90% Forward Push, 10% Brush. Very slow magnitudes.
+            buildCombos(angles.map(v => v * Math.PI), [-2, -1, 0, 0.5, 1, 1.5, 2], 0.9, 0.1, true);
+            
+        } else { // 'allround'
+            let angles = this.side === 'left' ? [0.4, 0.45, 0.5, 0.55, 0.6] : [0.6, 0.55, 0.5, 0.45, 0.4];
+            angles.push(0.3 + Math.random() * 0.4); // Inject random angle for variety
+            
+            // 80% Forward push, 20% Upward brush (Standard Rally Hit)
+            buildCombos(angles.map(v => v * Math.PI), [2, 4, 6, 8, 10, 12], 0.8, 0.2, true);
         }
 
-        for (let a of angles) {
-            for (let vx of xspeeds) {
-                for (let vy of yspeeds) {
-                    let testBall = new Ball(strikeBallState.x, strikeBallState.y);
-                    testBall.vx = strikeBallState.vx; testBall.vy = strikeBallState.vy; testBall.omega = strikeBallState.omega;
-                    let rvx = this.dir * vx;
-                    let rvy = vy; 
+        // --- 2. SINGLE EFFICIENT LOOP EXECUTION ---
+        for (let combo of combinations) {
+            let testBall = new Ball(strikeBallState.x, strikeBallState.y);
+            testBall.vx = strikeBallState.vx; testBall.vy = strikeBallState.vy; testBall.omega = strikeBallState.omega;
+            
+            let rvx = combo.vx;
+            let rvy = combo.vy; 
+            let a = combo.angle;
 
-                    let nx = -Math.sin(a); let ny = Math.cos(a);
-                    if (this.side === 'left' && nx < 0) { nx = -nx; ny = -ny; }
-                    if (this.side === 'right' && nx > 0) { nx = -nx; ny = -ny; }
+            let n = getNormal(a, this.side);
+            resolveCollision(testBall, {vx: rvx, vy: rvy}, n, RESTITUTION_RACKET, FRICTION_RACKET);
 
-                    resolveCollision(testBall, {vx: rvx, vy: rvy}, {x: nx, y: ny}, RESTITUTION_RACKET, FRICTION_RACKET);
-
-                    let hasCrossedNet = false;
-                    for (let i = 0; i < 120; i++) {
-                        for(let s=0; s<SUB_STEPS; s++) testBall.update(SUB_DT);
-                        let isPastNet = (this.side === 'left' && testBall.x > 0) || (this.side === 'right' && testBall.x < 0);
-                        if (isPastNet && !hasCrossedNet) {
-                            hasCrossedNet = true;
-                            if (testBall.y < 0.155) break; 
-                        }
-                        if (testBall.y < 0 && hasCrossedNet) {
-                            let diff = Math.abs(testBall.x - desiredLandingX);
-                            if (diff < bestDiff) {
-                                bestDiff = diff; 
-                                bestSwing = { vx: rvx, vy: rvy, angle: a, expectedLandingX: testBall.x };
-                            }
-                            break;
-                        }
+            let hasCrossedNet = false;
+            for (let i = 0; i < 120; i++) {
+                for(let s=0; s<SUB_STEPS; s++) testBall.update(SUB_DT);
+                
+                let isPastNet = (this.side === 'left' && testBall.x > 0) || (this.side === 'right' && testBall.x < 0);
+                if (isPastNet && !hasCrossedNet) {
+                    hasCrossedNet = true;
+                    if (testBall.y < 0.155) break; 
+                }
+                
+                if (testBall.y < 0 && hasCrossedNet) {
+                    let value;
+                    if (this.config.style === 'block') {
+                        // Your logic: Prioritize fast balls returning
+                        value = Math.abs(testBall.x - desiredLandingX) - Math.abs(testBall.vx);
+                    } else {
+                        value = Math.abs(testBall.x - desiredLandingX);
                     }
+                    
+                    if (value < bestValue) {
+                        bestValue = value; 
+                        bestSwing = { vx: rvx, vy: rvy, angle: a, expectedLandingX: testBall.x };
+                    }
+                    break;
                 }
             }
         }
+        
         return bestSwing || { vx: this.dir * 4, vy: 1.5, angle: Math.PI * 0.5, expectedLandingX: desiredLandingX };
     }
 
