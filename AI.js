@@ -6,8 +6,9 @@ export class AI {
     constructor(side) {
         this.side = side;
         this.dir = side === 'left' ? 1 : -1; 
-        this.baseX = side === 'left' ? -(TABLE_LENGTH / 2) - 0.1 : (TABLE_LENGTH / 2) + 0.1;
-        
+        this.baseX = side === 'left' ? -(TABLE_LENGTH / 2) - 0.15 : (TABLE_LENGTH / 2) + 0.15;
+        this.strikeStyle = 0.5; // 0.0 = Block (Rising), 0.5 = Apex (Top), 1.0 = Defensive (Falling)
+
         this.targetX = this.baseX;
         this.targetY = 0.2;
         this.targetAngle = Math.PI * 0.5;
@@ -42,11 +43,26 @@ export class AI {
                 if ((this.side === 'left' && simBall.x < 0) || (this.side === 'right' && simBall.x > 0)) simHasBounced = true;
             }
 
-            // Target strike zone (For Serve TOSS, we hit it as it falls back to 0.45m)
-            const targetY = (umpire.state === 'TOSS') ? 0.45 : 0.18;
-            const readyToHit = (umpire.state === 'TOSS') ? (simBall.vy < 0) : simHasBounced;
+            // Logic to determine when to strike based on the randomized style
+            let isStrikeTime = false;
+            if (umpire.state === 'TOSS') {
+                isStrikeTime = simBall.vy < 0 && simBall.y < 0.45; // Serves hit on way down
+            } else if (simHasBounced) {
+                //if (this.strikeStyle < 0) {
+                    // BLOCK: Hit quickly after the bounce
+                    // not working well
+                //    isStrikeTime = simBall.y > 0.4 || simBall.vy < 0; 
+                //} else
+                if (this.strikeStyle < 0.5) {
+                    // APEX: Hit at the highest point (velocity near zero)
+                    isStrikeTime = simBall.vy < 0; 
+                } else {
+                    // NORMAL/DEFENSIVE: Hit while falling at a height based on style
+                    isStrikeTime = simBall.vy < 0 && simBall.y < (0.1 + this.strikeStyle * 0.2);
+                }
+            }
 
-            if (readyToHit && simBall.vy < 0 && simBall.y < targetY) {
+            if (isStrikeTime) {
                 return { 
                     x: simBall.x, y: simBall.y, time: simTime, found: true,
                     ballState: { x: simBall.x, y: simBall.y, vx: simBall.vx, vy: simBall.vy, omega: simBall.omega }
@@ -63,8 +79,8 @@ export class AI {
         let bestSwing = null;
 
         // Serves need a more "downward" or "neutral" angle to hit own side first
-        let angles = this.side === 'left' ? [Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.7, Math.PI * 0.8, Math.PI * 0.9, Math.PI * Math.random()] : [Math.PI * 0.5, Math.PI * 0.4, Math.PI * 0.3, Math.PI * 0.2, Math.PI * 0.1, Math.PI * Math.random()];
-        let speedsx = [0, 1, 2, 3, 4, 5, 6 * Math.random()];
+        let angles = this.side === 'left' ? [Math.PI * (0.5 + 0.4 * Math.random())] : [Math.PI * (0.5 - 0.4 * Math.random())];
+        let speedsx = [0, 1, 2.5, 4, 5, 6 * Math.random()];
         let speedsy = [-2, -1, 0, 1, 2, 3 - (6 * Math.random())];
 
         for (let a of angles) {
@@ -122,9 +138,11 @@ export class AI {
         let bestDiff = Infinity;
         let bestSwing = null;
 
-        let angles = [Math.PI * 0.25, Math.PI * 0.4, Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.75, Math.PI * Math.random()];
-        let xspeeds = [0, 2, 4, 6, 8, 10, 12, Math.random() * 12]; 
-        let yspeeds = [-2, 0, 2, 4, 6, 12 - (Math.random() * 14)];
+        //let angles = [Math.PI * 0.25, Math.PI * 0.4, Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.75, Math.PI * Math.random(), Math.PI * Math.random()];
+        let angles = [Math.PI * 0.25, Math.PI * 0.4, Math.PI * 0.5, Math.PI * 0.6, Math.PI * 0.75, Math.PI * Math.random(), Math.PI * Math.random()];
+        
+        let xspeeds = [-1, 0, 2, 4, 6, 10, 14, Math.random() * 14]; 
+        let yspeeds = [-2, 0, 2, 4, 6, 12, 12 - (Math.random() * 14)];
 
         for (let a of angles) {
             for (let vx of xspeeds) {
@@ -214,7 +232,8 @@ export class AI {
 
         // --- 1. DYNAMIC SERVING ---
         if (umpire.state === 'PRE_SERVE' && umpire.server === this.side) {
-            this.targetX = this.baseX; this.targetY = 0.45;
+            this.targetX = this.baseX; 
+            this.targetY = 0.1; // FIX: Lowered from 0.45 to 0.1 (10cm above table)
             this.targetAngle = this.side === 'left' ? Math.PI * 0.75 : Math.PI * 0.25; 
             if (Math.random() < 0.02 && Math.abs(rx - this.targetX) < 0.05) onTossCommand(this.targetX);
             return { x: this.targetX, y: this.targetY, angle: this.targetAngle };
@@ -224,6 +243,7 @@ export class AI {
         if (umpire.state === 'TOSS' && umpire.server === this.side && this.state === 'IDLE') {
             let prediction = this.predictStrikePoint(ball, umpire);
             if (prediction.found) {
+                this.strikeStyle = Math.random(); // Randomize style for every new incoming ball
                 this.plan = prediction;
                 this.plannedSwing = this.calculateOptimalServe(prediction.ballState);
                 this.timeToImpact = prediction.time;
@@ -235,7 +255,10 @@ export class AI {
 
         // --- 2. RALLY PREDICTION ---
         const isIncoming = (this.side === 'left' && ball.vx < 0) || (this.side === 'right' && ball.vx > 0);
-        if (isIncoming && this.state === 'IDLE' && umpire.state === 'RALLY') {
+        const isOnMySide = (this.side === 'left' && ball.x < 0) || (this.side === 'right' && ball.x > 0);
+        
+        // Plan if the ball is moving toward us OR if it's already on our side and needs a return
+        if ((isIncoming || isOnMySide) && umpire.lastHitter !== this.side && this.state === 'IDLE' && umpire.state === 'RALLY') {
             let prediction = this.predictStrikePoint(ball, umpire);
             if (prediction.found) {
                 this.plan = prediction;
@@ -244,7 +267,9 @@ export class AI {
                 this.state = 'TRACKING';
                 this.hasRecalculated = false; this.hasHit = false;
             }
-        } else if (!isIncoming && umpire.state === 'RALLY') {
+        } 
+        // Only reset to IDLE if the ball is moving away AND is on the opponent's side
+        else if (!isIncoming && !isOnMySide && umpire.state === 'RALLY') {
             this.state = 'IDLE'; this.plan = null;
         }
 
