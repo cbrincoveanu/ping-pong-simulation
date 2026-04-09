@@ -1,4 +1,4 @@
-import { TABLE_LENGTH, TIME_STEP, SUB_DT, SUB_STEPS, RESTITUTION_RACKET, FRICTION_RACKET, GROUND_LENGTH } from './constants.js';
+import { TABLE_LENGTH, TIME_STEP, SUB_DT, SUB_STEPS, RESTITUTION_RACKET, FRICTION_RACKET, GROUND_LENGTH, NET_HEIGHT } from './constants.js';
 import { Ball } from './Ball.js';
 import { resolveCollision } from './physics.js';
 
@@ -58,11 +58,14 @@ export class AI {
                 } else if (this.config.style === 'chop') {
                     style = 'apex'; // or late?
                 } else if (this.config.style === 'block') {
-                    style = 'close';
+                    style = 'ultra-close';
                 } else {
                     style = 'apex';
                 }
-                if (style === 'close') {
+                if (style === 'ultra-close') {
+                    // hit ball ASAP
+                    isStrikeTime = simBall.vy < 0 || simBall.y > NET_HEIGHT || (this.side === 'left' ? simBall.x < this.baseX : simBall.x > this.baseX);
+                } else if (style === 'close') {
                     // hit ball when it starts going down or right after the table
                     isStrikeTime = simBall.vy < 0 || (this.side === 'left' ? simBall.x < this.baseX : simBall.x > this.baseX);
                 } else if (style === 'apex') {
@@ -200,9 +203,9 @@ export class AI {
             buildCombos(angles.map(v => v * Math.PI), [0, 1, 2, 4, 6, 8, 12], 0.25, 0.75, false);
             
         } else if (this.config.style === 'block') {
-            let angles = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+            let angles = [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8];
             // 90% Forward Push, 10% Brush. Very slow magnitudes.
-            buildCombos(angles.map(v => v * Math.PI), [-2, -1, 0, 0.5, 1, 1.5, 2], 0.9, 0.1, true);
+            buildCombos(angles.map(v => v * Math.PI), [-2, -1, 0, 1, 2], 0.5, 0.5, true);
             
         } else { // 'allround'
             let angles = this.side === 'left' ? [0.4, 0.45, 0.5, 0.55, 0.6] : [0.6, 0.55, 0.5, 0.45, 0.4];
@@ -238,7 +241,7 @@ export class AI {
                     let value;
                     if (this.config.style === 'block') {
                         // Your logic: Prioritize fast balls returning
-                        value = Math.abs(testBall.x - desiredLandingX) - Math.abs(testBall.vx);
+                        value = Math.abs(testBall.x - desiredLandingX); // - Math.abs(testBall.vx);
                     } else {
                         value = Math.abs(testBall.x - desiredLandingX);
                     }
@@ -340,6 +343,7 @@ export class AI {
                 this.timeToImpact = prediction.time;
                 this.state = 'TRACKING';
                 this.hasRecalculated = false; this.hasHit = false;
+                console.log(`[AI ${this.side}] Rally Hit Planned! Time to Impact: ${this.timeToImpact.toFixed(2)}s`);
             }
         } 
         // Only reset to IDLE if the ball is moving away AND is on the opponent's side
@@ -361,6 +365,7 @@ export class AI {
                     this.timeToImpact = newPrediction.time;
                 }
                 this.hasRecalculated = true;
+                console.log(`[AI ${this.side}] Recalculated Plan After Bounce! New Time to Impact: ${this.timeToImpact.toFixed(2)}s`);
             }
 
             this.timeToImpact -= dt;

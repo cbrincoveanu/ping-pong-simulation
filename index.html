@@ -7,25 +7,39 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="ui">
-        <h2>Table Tennis Sandbox</h2>
-
-        <div class="config-panel" id="configLeft">
-            <h3>🔴 Left Player</h3>
-            <div class="config-row"><label>Control:</label> <select id="modeLeft"><option value="human">Human</option><option value="ai" selected>AI</option></select></div>
-            <div class="config-row"><label>Style:</label> <select id="styleLeft"><option value="allround" selected>Allround</option><option value="aggressive">Aggressive</option><option value="chop">Chop</option><option value="block">Block</option></select></div>
+    <!-- UI Overlay -->
+    <div id="ui" style="position: absolute; top: 15px; left: 15px; z-index: 100; pointer-events: auto; background: rgba(15, 15, 25, 0.85); padding: 15px; border-radius: 8px; min-width: 300px; max-width: 350px; color: white;">
+        
+        <!-- Header & Toggle Button -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <h2 style="margin: 0; color: #4ecca3;">Table Tennis Sandbox</h2>
+            <button id="toggleUiBtn" style="background: #4ecca3; color: #1a1a2e; border: none; padding: 4px 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">Hide</button>
         </div>
 
-        <div class="config-panel right-ai" id="configRight">
-            <h3>🔵 Right Player</h3>
-            <div class="config-row"><label>Control:</label> <select id="modeRight" disabled><option value="ai" selected>AI</option></select></div>
-            <div class="config-row"><label>Style:</label> <select id="styleRight"><option value="allround" selected>Allround</option><option value="aggressive">Aggressive</option><option value="chop">Chop</option><option value="block">Block</option></select></div>
+        <!-- ALWAYS VISIBLE: Score & Umpire Status -->
+        <div id="essentialUi" style="margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 10px;">
+            <div style="font-size: 1.1rem; margin-bottom: 5px;"><strong>Score:</strong> <span id="scoreLeft">0</span> (L) - <span id="scoreRight">0</span> (R)</div>
+            <div style="color: #f1c40f; font-size: 0.9rem;"><strong>Status:</strong> <span id="statusMsg">Waiting...</span></div>
         </div>
 
-        <div id="infoPanel">
-            <div><strong>Score:</strong> <span id="scoreLeft">0</span> (L) - <span id="scoreRight">0</span> (R)</div>
-            <div><strong>Status:</strong> <span id="statusMsg">Waiting...</span></div>
-            <div id="stats">Speed: 0.0 m/s<br>Spin: 0 RPM</div> 
+        <!-- COLLAPSIBLE: Configs, Instructions, and Stats -->
+        <div id="collapsibleUi">
+            <div id="infoPanel" style="margin-bottom: 15px;">
+                <p style="margin: 0 0 5px 0; font-size: 0.9em;">Press <strong>'H'</strong> to Toggle Human Mode (Left)</p>
+                <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #aaa;"><strong>Mouse:</strong> Move | <strong>Click:</strong> Toss Ball</p>
+                <div id="stats" style="font-family: monospace; color: #aaa; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 4px;">Speed: 0.0 m/s<br>Spin: 0 RPM</div>
+            </div>
+
+            <div class="config-panel" style="background: rgba(0,0,0,0.3); padding: 10px; margin-bottom: 10px; border-left: 3px solid #4ecca3;">
+                <h3 style="margin: 0 0 5px 0; font-size: 1rem;">🔴 Left Player</h3>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><label>Mode:</label> <select id="modeLeft"><option value="ai" selected>AI</option><option value="human">Human</option></select></div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><label>Style:</label> <select id="styleLeft"><option value="allround" selected>Allround</option><option value="block">Block</option><option value="aggressive">Aggressive</option><option value="chop">Chop</option></select></div>
+            </div>
+
+            <div class="config-panel" style="background: rgba(0,0,0,0.3); padding: 10px; border-left: 3px solid #e74c3c;">
+                <h3 style="margin: 0 0 5px 0; font-size: 1rem;">🔵 Right Player</h3>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><label>Style:</label> <select id="styleRight"><option value="allround" selected>Allround</option><option value="block">Block</option><option value="aggressive">Aggressive</option><option value="chop">Chop</option></select></div>
+            </div>
         </div>
     </div>
 

@@ -15,6 +15,38 @@ let isHumanMode = false;
 
 let width, height, originX, originY;
 
+// --- UI Toggle Logic ---
+const toggleUiBtn = document.getElementById('toggleUiBtn');
+const collapsibleUi = document.getElementById('collapsibleUi');
+const uiContainer = document.getElementById('ui');
+
+let uiVisible = true;
+
+function setUiVisibility(visible) {
+    uiVisible = visible;
+    if (visible) {
+        collapsibleUi.style.display = 'block';
+        toggleUiBtn.innerText = 'Hide';
+        uiContainer.style.background = 'rgba(15, 15, 25, 0.85)';
+    } else {
+        collapsibleUi.style.display = 'none';
+        toggleUiBtn.innerText = 'Show UI';
+        // Make the background more transparent when collapsed so you can see the table better
+        uiContainer.style.background = 'rgba(15, 15, 25, 0.4)'; 
+    }
+}
+
+// Button Click Listener
+toggleUiBtn.addEventListener('click', () => {
+    setUiVisibility(!uiVisible);
+});
+
+// Auto-hide on mobile devices (screens narrower than 800px)
+if (window.innerWidth < 800) {
+    setUiVisibility(false);
+}
+// -----------------------
+
 // Initialize Objects
 const ball = new Ball(0, 0); 
 const env = new Environment();
